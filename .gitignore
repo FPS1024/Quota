@@ -1,0 +1,23 @@
+.DS_Store
+
+# Xcode user state
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Build products
+build/
+build_output/
+*.app
+*.dSYM
+*.ipa
+*.xcarchive
+*.log
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local tooling
+.idea/
+.vscode/
