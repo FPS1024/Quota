@@ -21,3 +21,4 @@ build_output/
 # Local tooling
 .idea/
 .vscode/
+/build.sh
