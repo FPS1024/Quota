@@ -21,3 +21,7 @@ Provider credentials are stored in the iOS Keychain. Providers must be configure
 - iOS 15.6 or newer
 
 Open `Quota.xcodeproj` in Xcode and run the `Quota` scheme.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
