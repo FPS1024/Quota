@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ProviderStore
@@ -84,12 +85,19 @@ struct SettingsView: View {
 
 private struct ProviderSettingsRow: View {
     @EnvironmentObject private var store: ProviderStore
+    @EnvironmentObject private var codexUsageStore: CodexUsageStore
 
     let provider: ProviderID
 
     private var statusText: String {
+        if provider == .openai, codexUsageStore.isEnabled {
+            return "enabled"
+        }
         if store.isEnabled(provider) {
             return "enabled"
+        }
+        if provider == .openai, codexUsageStore.isAuthenticated {
+            return "ready"
         }
         if store.isConfigured(provider) {
             return "ready"
@@ -111,7 +119,7 @@ private struct ProviderSettingsRow: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
 
-                    Text(provider.subtitle)
+                    Text(provider == .openai ? "API costs · Codex plan usage" : provider.subtitle)
                         .font(.caption)
                         .foregroundColor(QuotaColors.secondaryText)
                         .lineLimit(1)
@@ -121,7 +129,11 @@ private struct ProviderSettingsRow: View {
 
                 Text(statusText)
                     .font(.caption2)
-                    .foregroundColor(store.isEnabled(provider) ? provider.tint : QuotaColors.tertiaryText)
+                    .foregroundColor(
+                        store.isEnabled(provider) || (provider == .openai && codexUsageStore.isEnabled)
+                            ? provider.tint
+                            : QuotaColors.tertiaryText
+                    )
                     .lineLimit(1)
 
                 Image(systemName: "chevron.right")
@@ -159,6 +171,10 @@ private struct ProviderConfigurationView: View {
                     } else {
                         configurationCard
 
+                        if provider == .openai {
+                            CodexUsageSettingsCard()
+                        }
+
                         if store.isConfigured(provider) {
                             Button {
                                 showsRemoveConfirmation = true
@@ -181,24 +197,6 @@ private struct ProviderConfigurationView: View {
         }
         .navigationTitle(provider.displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if provider.kind != .manual {
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { store.isEnabled(provider) },
-                            set: { setEnabledState($0) }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(ProviderEnableToggleStyle())
-                    .disabled(!canToggleEnabled)
-                    .opacity(canToggleEnabled ? 1 : 0.42)
-                    .accessibilityLabel(store.isEnabled(provider) ? "禁用厂商" : "启用厂商")
-                }
-            }
-        }
         .onAppear(perform: loadDraftValues)
         .confirmationDialog(
             "移除 \(provider.displayName) 配置？",
@@ -232,6 +230,18 @@ private struct ProviderConfigurationView: View {
 
                 Spacer()
 
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.isEnabled(provider) },
+                        set: { setEnabledState($0) }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(ProviderEnableToggleStyle())
+                .disabled(!canToggleEnabled)
+                .opacity(canToggleEnabled ? 1 : 0.42)
+                .accessibilityLabel(store.isEnabled(provider) ? "禁用厂商" : "启用厂商")
             }
 
             Text(provider.configurationHint)
@@ -449,6 +459,240 @@ private struct ProviderConfigurationView: View {
     }
 }
 
+private struct CodexUsageSettingsCard: View {
+    @EnvironmentObject private var store: CodexUsageStore
+    @State private var accountToRemove: CodexAccountInfo?
+    @State private var copiedDeviceCode = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 11) {
+                ProviderLogoView(provider: .openai, size: 40, assetName: "ProviderCodex")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Codex")
+                        .font(.headline)
+                        .foregroundColor(QuotaColors.primaryText)
+
+                    Text(store.isAuthenticated
+                        ? "\(store.accounts.count) 个账号 · \(store.enabledAccounts.count) 个显示用量"
+                        : "ChatGPT 计划额度")
+                        .font(.caption)
+                        .foregroundColor(QuotaColors.secondaryText)
+                }
+
+                Spacer()
+
+            }
+
+            if !store.accounts.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(store.accounts) { account in
+                        accountRow(account)
+                    }
+                }
+            }
+
+            if let deviceCode = store.deviceCode {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("在浏览器中打开验证页面，然后输入这组一次性配对码。")
+                        .font(.subheadline)
+                        .foregroundColor(QuotaColors.secondaryText)
+
+                    Button {
+                        UIPasteboard.general.string = deviceCode.userCode
+                        copiedDeviceCode = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(deviceCode.userCode)
+                                .font(.system(.title2, design: .monospaced).weight(.bold))
+                                .foregroundColor(QuotaColors.primaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+
+                            Spacer(minLength: 4)
+
+                            Label(
+                                copiedDeviceCode ? "已复制" : "复制",
+                                systemImage: copiedDeviceCode ? "checkmark" : "doc.on.doc"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(ProviderID.openai.tint)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 14)
+                        .background(ProviderID.openai.tint.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(copiedDeviceCode ? "配对码已复制" : "复制 Codex 配对码")
+
+                    Link(destination: deviceCode.verificationURL) {
+                        Label("打开 Codex 验证页面", systemImage: "arrow.up.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("等待浏览器确认登录…")
+                            .font(.caption)
+                            .foregroundColor(QuotaColors.secondaryText)
+                        Spacer()
+                        Button("取消") { store.cancelLogin() }
+                            .font(.caption.weight(.medium))
+                    }
+                }
+            } else if store.isLoggingIn {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("正在准备设备验证码…")
+                        .font(.caption)
+                        .foregroundColor(QuotaColors.secondaryText)
+                    Spacer()
+                    Button("取消") { store.cancelLogin() }
+                        .font(.caption.weight(.medium))
+                }
+            }
+
+            if store.accounts.isEmpty {
+                Text("使用 ChatGPT device code 登录。额度凭据仅保存在本机钥匙串。")
+                    .font(.caption)
+                    .foregroundColor(QuotaColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("每个账号单独设置是否显示用量，额度和登录状态也分开保存。")
+                    .font(.caption)
+                    .foregroundColor(QuotaColors.secondaryText)
+            }
+
+            if !store.isLoggingIn {
+                Button {
+                    store.beginLogin()
+                } label: {
+                    Label(
+                        store.isAuthenticated ? "添加另一个 Codex 账号" : "使用 ChatGPT 登录 Codex",
+                        systemImage: store.isAuthenticated ? "person.badge.plus" : "arrow.right.circle"
+                    )
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+
+            if let errorMessage = store.errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundColor(QuotaColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text("额度读取使用 Codex 内部接口，官方调整接口时可能需要更新。")
+                .font(.caption2)
+                .foregroundColor(QuotaColors.tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .background(QuotaColors.raisedSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(cardBorder())
+        .confirmationDialog(
+            "退出此 Codex 账号？",
+            isPresented: Binding(
+                get: { accountToRemove != nil },
+                set: { if !$0 { accountToRemove = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let selectedAccount = accountToRemove {
+                Button("退出登录", role: .destructive) {
+                    store.signOut(accountID: selectedAccount.id)
+                    accountToRemove = nil
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将从本机删除此账号的登录凭据和额度数据。")
+        }
+        .onChange(of: store.deviceCode?.userCode) { _ in
+            copiedDeviceCode = false
+        }
+    }
+
+    private func accountRow(_ account: CodexAccountInfo) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 11) {
+                VStack(alignment: .leading, spacing: 3) {
+                    if account.displayName.caseInsensitiveCompare(account.email ?? "") != .orderedSame {
+                        Text(account.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(QuotaColors.primaryText)
+                            .lineLimit(1)
+                    }
+                    Text(account.email ?? account.detail)
+                        .font(.caption)
+                        .foregroundColor(QuotaColors.secondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+
+                Spacer(minLength: 4)
+
+                if store.loadingAccountIDs.contains(account.id) {
+                    ProgressView()
+                } else if store.snapshots[account.id] != nil {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Color.green)
+                        .accessibilityLabel("额度已同步")
+                }
+
+                Toggle("", isOn: Binding(
+                    get: { store.isEnabled(accountID: account.id) },
+                    set: { store.setEnabled($0, for: account.id) }
+                ))
+                .labelsHidden()
+                .toggleStyle(ProviderEnableToggleStyle())
+                .accessibilityLabel(store.isEnabled(accountID: account.id)
+                    ? "关闭此账号的 Codex 用量显示"
+                    : "显示此账号的 Codex 用量")
+            }
+
+            if let snapshot = store.snapshots[account.id] {
+                Text(snapshot.windows.map { window in
+                    guard let remaining = window.remainingPercent else {
+                        return "\(window.title)：—"
+                    }
+                    return "\(window.title)：剩余 \(Int(remaining.rounded()))%"
+                }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundColor(QuotaColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let error = store.accountErrors[account.id] {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(QuotaColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                accountToRemove = account
+            } label: {
+                Label("退出此账号", systemImage: "rectangle.portrait.and.arrow.right")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundColor(QuotaColors.danger)
+                    .background(QuotaColors.danger.opacity(0.09))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(13)
+        .background(QuotaColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+    }
+}
+
 private struct ProviderEnableToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button {
@@ -461,7 +705,7 @@ private struct ProviderEnableToggleStyle: ToggleStyle {
                     .fill(
                         configuration.isOn
                             ? Color(red: 0.18, green: 0.68, blue: 0.36)
-                            : Color(red: 0.94, green: 0.52, blue: 0.16)
+                            : Color(uiColor: .systemGray3)
                     )
                     .frame(width: 51, height: 31)
 

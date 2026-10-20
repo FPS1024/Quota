@@ -9,11 +9,14 @@ Quota is a minimal SwiftUI app for checking API balances and organization usage 
 - OpenRouter
 - xAI
 - OpenAI
+- OpenAI Codex (ChatGPT plan usage)
 - Anthropic
 - Qwen
 - Google Gemini
 
-Provider credentials are stored in the iOS Keychain. Providers must be configured and enabled in Settings before they appear on the Usage page.
+API provider credentials are stored in the iOS Keychain. Configure and enable providers in Settings before they appear on the Usage page. To add Codex, open **Settings → OpenAI**, sign in with the ChatGPT device code, then enable each account you want to show on the Usage page. Codex accounts have independent usage switches and can be signed out individually.
+
+Codex stores OAuth credentials in the iOS Keychain and shows account details when the sign-in token provides them. Its quota cards read Codex's internal usage endpoint, which may change without notice; they do not read token activity logs. OpenAI API organization costs remain a separate provider entry.
 
 ## Requirements
 

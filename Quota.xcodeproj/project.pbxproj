@@ -15,6 +15,7 @@
 		8AD45D763082AEFC005A87F4 /* ProviderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD45D753082AEFC005A87F4 /* ProviderStore.swift */; };
 		8AD45D783082AEFC005A87F4 /* BalanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD45D773082AEFC005A87F4 /* BalanceView.swift */; };
 		8AD45D7A3082AEFC005A87F4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD45D793082AEFC005A87F4 /* SettingsView.swift */; };
+		8AD45D7C3082AEFC005A87F4 /* CodexUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD45D7B3082AEFC005A87F4 /* CodexUsage.swift */; };
 		8AD45D643082AEFF005A87F4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8AD45D633082AEFF005A87F4 /* Assets.xcassets */; };
 		8AD45D673082AEFF005A87F4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8AD45D663082AEFF005A87F4 /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -29,6 +30,7 @@
 		8AD45D753082AEFC005A87F4 /* ProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderStore.swift; sourceTree = "<group>"; };
 		8AD45D773082AEFC005A87F4 /* BalanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceView.swift; sourceTree = "<group>"; };
 		8AD45D793082AEFC005A87F4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8AD45D7B3082AEFC005A87F4 /* CodexUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsage.swift; sourceTree = "<group>"; };
 		8AD45D633082AEFF005A87F4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8AD45D663082AEFF005A87F4 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -71,6 +73,7 @@
 				8AD45D753082AEFC005A87F4 /* ProviderStore.swift */,
 				8AD45D773082AEFC005A87F4 /* BalanceView.swift */,
 				8AD45D793082AEFC005A87F4 /* SettingsView.swift */,
+				8AD45D7B3082AEFC005A87F4 /* CodexUsage.swift */,
 				8AD45D633082AEFF005A87F4 /* Assets.xcassets */,
 				8AD45D653082AEFF005A87F4 /* Preview Content */,
 			);
@@ -162,6 +165,7 @@
 				8AD45D763082AEFC005A87F4 /* ProviderStore.swift in Sources */,
 				8AD45D783082AEFC005A87F4 /* BalanceView.swift in Sources */,
 				8AD45D7A3082AEFC005A87F4 /* SettingsView.swift in Sources */,
+				8AD45D7C3082AEFC005A87F4 /* CodexUsage.swift in Sources */,
 				8AD45D5E3082AEFC005A87F4 /* QuotaApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

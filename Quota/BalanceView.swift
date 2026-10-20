@@ -10,6 +10,7 @@ enum QuotaColors {
     static let separator = Color(uiColor: .separator)
     static let accent = Color(uiColor: .label)
     static let danger = Color(uiColor: .systemRed)
+    static let usageBadgeTint = Color(red: 0.22, green: 0.43, blue: 0.62)
 }
 
 extension ProviderID {
@@ -38,13 +39,14 @@ extension ProviderID {
 struct ProviderLogoView: View {
     let provider: ProviderID
     var size: CGFloat = 38
+    var assetName: String? = nil
 
     private var logoScale: CGFloat {
         provider == .gemini ? 0.75 : 1
     }
 
     var body: some View {
-        Image(provider.logoAssetName)
+        Image(assetName ?? provider.logoAssetName)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
@@ -62,6 +64,7 @@ struct ProviderLogoView: View {
 
 struct BalanceView: View {
     @EnvironmentObject private var store: ProviderStore
+    @EnvironmentObject private var codexUsageStore: CodexUsageStore
 
     let openSettings: () -> Void
 
@@ -80,7 +83,12 @@ struct BalanceView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
-                    if store.enabledProviders.isEmpty {
+                    if !codexUsageStore.enabledAccounts.isEmpty {
+                        CodexUsageSection()
+                    }
+
+                    if store.enabledProviders.isEmpty
+                        && codexUsageStore.enabledAccounts.isEmpty {
                         EmptyProvidersCard(openSettings: openSettings)
                     } else {
                         ForEach(store.enabledProviders) { provider in
@@ -103,6 +111,9 @@ struct BalanceView: View {
             if !store.enabledProviders.isEmpty, store.snapshots.isEmpty {
                 _ = await store.refreshEnabledProviders()
             }
+            if codexUsageStore.isEnabled, codexUsageStore.snapshots.isEmpty {
+                _ = await codexUsageStore.refreshAll()
+            }
         }
     }
 
@@ -117,16 +128,19 @@ struct BalanceView: View {
 
     @MainActor
     private func performRefresh() async {
-        guard !store.enabledProviders.isEmpty else {
+        guard !store.enabledProviders.isEmpty || codexUsageStore.isEnabled else {
             showTemporarily(
                 RefreshFeedback(kind: .neutral, message: "没有已启用的厂商")
             )
             return
         }
 
+        let codexSucceeded = codexUsageStore.isEnabled
+            ? await codexUsageStore.refreshAll()
+            : true
         let result = await store.refreshEnabledProviders()
 
-        if !result.failedProviders.isEmpty {
+        if !result.failedProviders.isEmpty || !codexSucceeded {
             showTemporarily(
                 RefreshFeedback(kind: .failure, message: "刷新失败")
             )
@@ -134,7 +148,7 @@ struct BalanceView: View {
             showTemporarily(
                 RefreshFeedback(kind: .neutral, message: "刷新未完成")
             )
-        } else if result.successfulProviders > 0 {
+        } else if result.successfulProviders > 0 || codexUsageStore.isEnabled {
             showTemporarily(
                 RefreshFeedback(kind: .success, message: "刷新成功")
             )
@@ -166,6 +180,210 @@ struct BalanceView: View {
     }
 }
 
+private struct CodexUsageSection: View {
+    @EnvironmentObject private var store: CodexUsageStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(store.enabledAccounts) { account in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .center, spacing: 8) {
+                        ProviderLogoView(provider: .openai, size: 24, assetName: "ProviderCodex")
+
+                        Text(account.email ?? account.detail)
+                            .font(.title3.weight(.semibold))
+                            .foregroundColor(QuotaColors.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 2)
+
+                    CodexAccountUsageCard(account: account)
+                }
+            }
+        }
+    }
+}
+
+private struct CodexAccountUsageCard: View {
+    @EnvironmentObject private var store: CodexUsageStore
+
+    let account: CodexAccountInfo
+
+    private var snapshot: CodexUsageSnapshot? {
+        store.snapshots[account.id]
+    }
+
+    private var planLabel: String {
+        guard let rawPlan = snapshot?.planType?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawPlan.isEmpty else {
+            return "ChatGPT"
+        }
+
+        var key = rawPlan.lowercased().replacingOccurrences(of: "-", with: "_")
+        if key.hasPrefix("chatgpt_") {
+            key.removeFirst("chatgpt_".count)
+        }
+        if key.hasSuffix("_plan") {
+            key.removeLast("_plan".count)
+        }
+
+        let knownPlans: [String: String] = [
+            "free": "Free",
+            "free_workspace": "Free Workspace",
+            "go": "Go",
+            "plus": "Plus",
+            "pro": "Pro",
+            "prolite": "Pro",
+            "promax": "Pro Max",
+            "team": "Team",
+            "business": "Business",
+            "self_serve_business_prolite": "Business Pro",
+            "self_serve_business_usage_based": "Business",
+            "enterprise": "Enterprise",
+            "ent26": "Enterprise",
+            "enterprise_cbp_automation": "Enterprise",
+            "enterprise_cbp_usage_based": "Enterprise",
+            "education": "Education",
+            "edu": "Education",
+            "edu_plus": "Edu Plus",
+            "edu_pro": "Edu Pro",
+            "sci": "Academic Researchers",
+            "sci_plus": "Academic Researchers Plus",
+            "hc": "Enterprise",
+            "quorum": "Quorum",
+            "k12": "K-12"
+        ]
+        let title = knownPlans[key] ?? key
+            .split(separator: "_")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+        return "ChatGPT · \(title)"
+    }
+
+    private func updatedTimestamp(_ date: Date) -> String {
+        let style = Date.FormatStyle(date: .abbreviated, time: .shortened)
+            .locale(Locale(identifier: "en_US"))
+        return "Updated \(date.formatted(style))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(planLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(QuotaColors.usageBadgeTint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(QuotaColors.usageBadgeTint.opacity(0.10))
+                    .clipShape(Capsule())
+
+                Spacer(minLength: 0)
+            }
+
+            if let snapshot {
+                ForEach(snapshot.windows) { window in
+                    CodexUsageWindowRow(window: window)
+                }
+
+                Text(updatedTimestamp(snapshot.updatedAt))
+                    .font(.caption2)
+                    .foregroundColor(QuotaColors.tertiaryText)
+            } else if store.loadingAccountIDs.contains(account.id) {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Fetching Codex usage…")
+                        .font(.caption)
+                        .foregroundColor(QuotaColors.secondaryText)
+                }
+            } else {
+                Text(store.accountErrors[account.id] ?? "No usage data returned by Codex yet.")
+                    .font(.caption)
+                    .foregroundColor(store.accountErrors[account.id] == nil
+                        ? QuotaColors.secondaryText
+                        : QuotaColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    Task { await store.refresh(accountID: account.id) }
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                }
+                .font(.caption.weight(.medium))
+            }
+
+            if let errorMessage = store.accountErrors[account.id], snapshot != nil {
+                ProviderInlineError(message: errorMessage)
+            }
+        }
+        .padding(16)
+        .background(QuotaColors.raisedSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(cardBorder())
+    }
+}
+
+private struct CodexUsageWindowRow: View {
+    let window: CodexUsageWindow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(window.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(QuotaColors.primaryText)
+
+                Spacer()
+
+                if let remaining = window.remainingPercent {
+                    Text("\(Int(remaining.rounded()))%")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundColor(QuotaColors.primaryText)
+                } else {
+                    Text("—")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(QuotaColors.tertiaryText)
+                }
+            }
+
+            if let remaining = window.remainingPercent {
+                ProgressView(value: remaining, total: 100)
+                    .tint(Color(red: 0.18, green: 0.68, blue: 0.36))
+            }
+
+            if let resetAt = window.resetAt {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    Text(resetCountdown(until: resetAt, now: context.date))
+                        .font(.caption2)
+                        .foregroundColor(QuotaColors.tertiaryText)
+                }
+            }
+        }
+    }
+
+    private func resetCountdown(until resetAt: Date, now: Date) -> String {
+        let secondsRemaining = max(0, Int(ceil(resetAt.timeIntervalSince(now))))
+        guard secondsRemaining > 0 else { return "Resetting" }
+
+        let days = secondsRemaining / 86_400
+        let hours = (secondsRemaining % 86_400) / 3_600
+        let minutes = (secondsRemaining % 3_600) / 60
+        let seconds = secondsRemaining % 60
+
+        if days > 0 {
+            return hours > 0 ? "Resets in \(days)d \(hours)h" : "Resets in \(days)d"
+        }
+        if hours > 0 {
+            return minutes > 0 ? "Resets in \(hours)h \(minutes)m" : "Resets in \(hours)h"
+        }
+        if minutes > 0 { return "Resets in \(minutes)m" }
+        return "Resets in \(seconds)s"
+    }
+}
+
 private struct ProviderUsageSection: View {
     @EnvironmentObject private var store: ProviderStore
 
@@ -193,10 +411,6 @@ private struct ProviderUsageSection: View {
                     .foregroundColor(QuotaColors.primaryText)
 
                 Spacer()
-
-                Text(provider.kind == .cost ? "usage" : "balance")
-                    .font(.caption)
-                    .foregroundColor(provider.tint.opacity(0.8))
             }
             .padding(.horizontal, 2)
 
@@ -227,10 +441,10 @@ private struct ProviderUsageCard: View {
             HStack(spacing: 8) {
                 Text(snapshot.context)
                     .font(.caption.weight(.medium))
-                    .foregroundColor(snapshot.provider.tint)
+                    .foregroundColor(QuotaColors.usageBadgeTint)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(snapshot.provider.tint.opacity(0.10))
+                    .background(QuotaColors.usageBadgeTint.opacity(0.10))
                     .clipShape(Capsule())
 
                 Spacer()
@@ -323,7 +537,7 @@ private struct EmptyProvidersCard: View {
                     .font(.title3.weight(.semibold))
                     .foregroundColor(QuotaColors.primaryText)
 
-                Text("先在 Settings 中完成配置并启用，Usage 才会显示对应的 API 额度。")
+                Text("先在 Settings 中完成配置并启用，Usage 才会显示 API 或 Codex 额度。")
                     .font(.subheadline)
                     .foregroundColor(QuotaColors.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

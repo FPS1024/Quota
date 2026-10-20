@@ -3,11 +3,14 @@ import Security
 
 enum ProviderCredentialStoreError: LocalizedError {
     case keychain(OSStatus)
+    case verificationFailed
 
     var errorDescription: String? {
         switch self {
         case .keychain(let status):
             return "无法访问钥匙串（错误码 \(status)）。"
+        case .verificationFailed:
+            return "钥匙串中的登录凭据删除后仍然存在。"
         }
     }
 }

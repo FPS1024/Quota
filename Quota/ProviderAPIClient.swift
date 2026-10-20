@@ -90,7 +90,7 @@ final class ProviderAPIClient {
             return ProviderUsageSnapshot(
                 id: "deepseek.\(currency.lowercased())",
                 provider: .deepseek,
-                context: "\(currency) · \(currencyDisplayName(currency))",
+                context: "Balance · \(currency)",
                 primaryLabel: "总余额（剩余可用）",
                 primaryValue: ProviderAmountFormatter.stringCurrency(info.totalBalance, code: currency),
                 metrics: [
@@ -147,7 +147,7 @@ final class ProviderAPIClient {
             ProviderUsageSnapshot(
                 id: "moonshot.\(currency.lowercased())",
                 provider: .moonshot,
-                context: "\(currency) · 人民币",
+                context: "Balance · \(currency)",
                 primaryLabel: "剩余可用余额",
                 primaryValue: ProviderAmountFormatter.currency(available, code: currency),
                 metrics: [
@@ -198,7 +198,7 @@ final class ProviderAPIClient {
             ProviderUsageSnapshot(
                 id: "openrouter.usd",
                 provider: .openrouter,
-                context: "USD · Credits",
+                context: "Credit · USD",
                 primaryLabel: "剩余余额",
                 primaryValue: ProviderAmountFormatter.currency(remaining, code: "USD"),
                 metrics: [
@@ -256,7 +256,7 @@ final class ProviderAPIClient {
             ProviderUsageSnapshot(
                 id: "xai.usd",
                 provider: .xai,
-                context: "USD · Prepaid Credits",
+                context: "Credit · USD",
                 primaryLabel: "预付余额",
                 primaryValue: ProviderAmountFormatter.currency(balanceUSD, code: "USD"),
                 metrics: [
@@ -322,7 +322,7 @@ final class ProviderAPIClient {
             return ProviderUsageSnapshot(
                 id: "openai.\(currency.lowercased())",
                 provider: .openai,
-                context: "\(currency) · Organization Costs",
+                context: "Cost · \(currency)",
                 primaryLabel: "本月组织用量",
                 primaryValue: ProviderAmountFormatter.currency(value, code: currency),
                 metrics: [
@@ -391,7 +391,7 @@ final class ProviderAPIClient {
             return ProviderUsageSnapshot(
                 id: "anthropic.\(currency.lowercased())",
                 provider: .anthropic,
-                context: "\(currency) · Cost Report",
+                context: "Cost · \(currency)",
                 primaryLabel: "本月用量",
                 primaryValue: ProviderAmountFormatter.currency(value, code: currency),
                 metrics: [
@@ -461,17 +461,6 @@ final class ProviderAPIClient {
 
     private func amountValue(_ rawValue: String) -> Double {
         Double(rawValue.replacingOccurrences(of: ",", with: ".")) ?? 0
-    }
-
-    private func currencyDisplayName(_ currency: String) -> String {
-        switch currency.uppercased() {
-        case "CNY":
-            return "人民币"
-        case "USD":
-            return "美元"
-        default:
-            return currency
-        }
     }
 
     private func startOfCurrentMonthUTC() -> Date {
